@@ -70,6 +70,13 @@ final class AutoOffSleepCoordinator {
         isPending = result == .changed(to: false)
     }
 
+    @discardableResult
+    func cancelPending() -> Bool {
+        let wasPending = isPending
+        isPending = false
+        return wasPending
+    }
+
     /// Requests sleep once the confirmed state is OFF. A confirmed ON state
     /// means the user re-enabled awake mode before completion, so the pending
     /// sleep is cancelled rather than firing later against their intent.

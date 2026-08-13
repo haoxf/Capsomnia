@@ -7,6 +7,7 @@ private enum PreferenceKey {
     static let launchAtLogin = "LaunchAtLogin"
     static let displaySleepOnLidClose = "DisplaySleepOnLidClose"
     static let ignoreExternalCapsLockOffWhileLidClosed = "IgnoreExternalCapsLockOffWhileLidClosed"
+    static let respectExternalSleepPrevention = "RespectExternalSleepPrevention"
     static let autoOffMinutes = "AutoOffMinutes"
     static let shortcutKeyCode = "ShortcutKeyCode"
     static let shortcutModifiers = "ShortcutModifiers"
@@ -26,6 +27,7 @@ enum Preferences {
             PreferenceKey.launchAtLogin: true,
             PreferenceKey.displaySleepOnLidClose: true,
             PreferenceKey.ignoreExternalCapsLockOffWhileLidClosed: false,
+            PreferenceKey.respectExternalSleepPrevention: true,
             PreferenceKey.autoOffMinutes: 0,
             PreferenceKey.didCompleteInitialSetup: false,
             PreferenceKey.forceWelcomeOnNextLaunch: false
@@ -70,6 +72,14 @@ enum Preferences {
     static var ignoreExternalCapsLockOffWhileLidClosed: Bool {
         get { defaults.bool(forKey: PreferenceKey.ignoreExternalCapsLockOffWhileLidClosed) }
         set { defaults.set(newValue, forKey: PreferenceKey.ignoreExternalCapsLockOffWhileLidClosed) }
+    }
+
+    /// When Capsomnia turns off, release sleep prevention once. Later
+    /// `SleepDisabled=1` writes from another controller are accepted instead
+    /// of being overwritten back to `0`.
+    static var respectExternalSleepPrevention: Bool {
+        get { defaults.bool(forKey: PreferenceKey.respectExternalSleepPrevention) }
+        set { defaults.set(newValue, forKey: PreferenceKey.respectExternalSleepPrevention) }
     }
 
     /// Minutes after which awake mode turns itself off automatically.

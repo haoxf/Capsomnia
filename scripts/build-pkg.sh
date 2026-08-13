@@ -8,6 +8,8 @@ DIST_DIR="${1:-$ROOT_DIR/dist}"
 APP_SIGN_ID="${APP_SIGN_ID:-Developer ID Application: Taketo Fujimaki (ZJZ8627852)}"
 PKG_SIGN_ID="${PKG_SIGN_ID:-Developer ID Installer: Taketo Fujimaki (ZJZ8627852)}"
 SKIP_SIGNING="${SKIP_SIGNING:-false}"
+SKIP_APP_SIGNING="${SKIP_APP_SIGNING:-$SKIP_SIGNING}"
+SKIP_PKG_SIGNING="${SKIP_PKG_SIGNING:-$SKIP_SIGNING}"
 HELPER_PATH="/Library/PrivilegedHelperTools/capsomnia-pmset"
 LEGACY_HELPER_PATH="/usr/local/sbin/capsomnia-pmset"
 SUDOERS_PATH="/etc/sudoers.d/capsomnia"
@@ -45,7 +47,7 @@ BUILT_APP="$("$ROOT_DIR/scripts/build-app.sh" "$WORK_DIR/$APP_NAME.app")"
 /usr/bin/install -m 0755 \
   "$ROOT_DIR/.build/release/capsomnia-pmset" \
   "$PAYLOAD_ROOT/Library/PrivilegedHelperTools/capsomnia-pmset"
-if [[ "$SKIP_SIGNING" != "true" ]]; then
+if [[ "$SKIP_APP_SIGNING" != "true" ]]; then
   /usr/bin/codesign --force --options runtime --timestamp --sign "$APP_SIGN_ID" "$BUILT_APP"
   /usr/bin/codesign --verify --deep --strict --verbose=2 "$BUILT_APP"
   /usr/bin/codesign \
@@ -221,7 +223,7 @@ if [[ -n "$appledouble_entry" ]]; then
   exit 1
 fi
 
-if [[ "$SKIP_SIGNING" == "true" ]]; then
+if [[ "$SKIP_PKG_SIGNING" == "true" ]]; then
   echo "$UNSIGNED_PKG"
 else
   /usr/bin/productsign --sign "$PKG_SIGN_ID" "$UNSIGNED_PKG" "$SIGNED_PKG"

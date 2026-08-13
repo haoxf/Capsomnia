@@ -78,6 +78,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let externalCapsLockOffToggle = LEDToggle(
         isOn: Preferences.ignoreExternalCapsLockOffWhileLidClosed
     )
+    private let respectExternalSleepPreventionTitle = brandLabel(
+        size: 13,
+        weight: .medium,
+        color: Brand.text
+    )
+    private let respectExternalSleepPreventionDesc = brandLabel(
+        size: 12,
+        color: Brand.textDim,
+        wraps: true
+    )
+    private let respectExternalSleepPreventionToggle = LEDToggle(
+        isOn: Preferences.respectExternalSleepPrevention
+    )
 
     private let shortcutHeading = brandLabel(
         size: 11,
@@ -115,6 +128,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let onLaunchAtLoginChange: (Bool) -> Void
     private let onDisplaySleepOnLidCloseChange: (Bool) -> Void
     private let onIgnoreExternalCapsLockOffWhileLidClosedChange: (Bool) -> Void
+    private let onRespectExternalSleepPreventionChange: (Bool) -> Void
     private let onAutoOffMinutesChange: (Int) -> Void
     private let onAutoOffRestart: () -> Void
     private let autoOffDisplayProvider: () -> AutoOffDisplayState
@@ -130,6 +144,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         onLaunchAtLoginChange: @escaping (Bool) -> Void,
         onDisplaySleepOnLidCloseChange: @escaping (Bool) -> Void,
         onIgnoreExternalCapsLockOffWhileLidClosedChange: @escaping (Bool) -> Void,
+        onRespectExternalSleepPreventionChange: @escaping (Bool) -> Void,
         onAutoOffMinutesChange: @escaping (Int) -> Void,
         onAutoOffRestart: @escaping () -> Void,
         autoOffDisplayProvider: @escaping () -> AutoOffDisplayState,
@@ -143,6 +158,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         self.onLaunchAtLoginChange = onLaunchAtLoginChange
         self.onDisplaySleepOnLidCloseChange = onDisplaySleepOnLidCloseChange
         self.onIgnoreExternalCapsLockOffWhileLidClosedChange = onIgnoreExternalCapsLockOffWhileLidClosedChange
+        self.onRespectExternalSleepPreventionChange = onRespectExternalSleepPreventionChange
         self.onAutoOffMinutesChange = onAutoOffMinutesChange
         self.onAutoOffRestart = onAutoOffRestart
         self.autoOffDisplayProvider = autoOffDisplayProvider
@@ -219,6 +235,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         externalCapsLockOffTitle.stringValue = strings.ignoreExternalCapsLockOffWhileLidClosed
         externalCapsLockOffDesc.stringValue = strings.ignoreExternalCapsLockOffWhileLidClosedDesc
         externalCapsLockOffToggle.setAccessibilityLabel(strings.ignoreExternalCapsLockOffWhileLidClosed)
+        respectExternalSleepPreventionTitle.stringValue = strings.respectExternalSleepPrevention
+        respectExternalSleepPreventionDesc.stringValue = strings.respectExternalSleepPreventionDesc
+        respectExternalSleepPreventionToggle.setAccessibilityLabel(strings.respectExternalSleepPrevention)
         openAtLoginTitle.stringValue = strings.openAtLogin
         openAtLoginDesc.stringValue = strings.openAtLoginDesc
         openAtLoginToggle.setAccessibilityLabel(strings.openAtLogin)
@@ -599,6 +618,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             self?.onIgnoreExternalCapsLockOffWhileLidClosedChange(enabled)
             self?.updateValues()
         }
+        respectExternalSleepPreventionToggle.onToggle = { [weak self] enabled in
+            self?.onRespectExternalSleepPreventionChange(enabled)
+            self?.updateValues()
+        }
         openAtLoginToggle.onToggle = { [weak self] enabled in
             self?.onLaunchAtLoginChange(enabled)
             self?.updateValues()
@@ -618,10 +641,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             desc: openAtLoginDesc,
             accessory: openAtLoginToggle
         )
+        let respectExternalSleepPreventionRow = settingRow(
+            title: respectExternalSleepPreventionTitle,
+            desc: respectExternalSleepPreventionDesc,
+            accessory: respectExternalSleepPreventionToggle
+        )
         let card = brandCard()
         let rows: [NSView] = [
             displayRow, brandDivider(),
             externalCapsLockOffRow, brandDivider(),
+            respectExternalSleepPreventionRow, brandDivider(),
             openAtLoginRow
         ]
         let stack = NSStackView(views: rows)
@@ -697,6 +726,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         languagePopUp.setSelected(Preferences.language.rawValue)
         displaySleepOnLidCloseToggle.setOn(Preferences.displaySleepOnLidClose)
         externalCapsLockOffToggle.setOn(Preferences.ignoreExternalCapsLockOffWhileLidClosed)
+        respectExternalSleepPreventionToggle.setOn(Preferences.respectExternalSleepPrevention)
         openAtLoginToggle.setOn(Preferences.launchAtLogin)
         shortcutRecorder.setShortcut(Preferences.keyboardShortcut)
         autoOffControl.setMinutes(Preferences.autoOffMinutes)

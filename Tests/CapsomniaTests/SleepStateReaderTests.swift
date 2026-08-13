@@ -27,6 +27,55 @@ final class SleepStateReaderTests: XCTestCase {
     }
 }
 
+final class SleepStateDriftPolicyTests: XCTestCase {
+    func testAcceptsExternalPreventionOnlyWhileCapsomniaIsOffInCompatibilityMode() {
+        XCTAssertTrue(
+            SleepStateDriftPolicy.acceptsExternalPrevention(
+                desiredState: false,
+                actualState: true,
+                respectExternalSleepPrevention: true
+            )
+        )
+        XCTAssertFalse(
+            SleepStateDriftPolicy.acceptsExternalPrevention(
+                desiredState: false,
+                actualState: true,
+                respectExternalSleepPrevention: false
+            )
+        )
+        XCTAssertFalse(
+            SleepStateDriftPolicy.acceptsExternalPrevention(
+                desiredState: true,
+                actualState: false,
+                respectExternalSleepPrevention: true
+            )
+        )
+    }
+}
+
+final class SleepStateOwnershipPolicyTests: XCTestCase {
+    func testCompatibilityModeSkipsExitCleanupOnlyAfterCapsomniaIsOff() {
+        XCTAssertFalse(
+            SleepStateOwnershipPolicy.shouldRestoreOnTerminate(
+                capsLockOn: false,
+                respectExternalSleepPrevention: true
+            )
+        )
+        XCTAssertTrue(
+            SleepStateOwnershipPolicy.shouldRestoreOnTerminate(
+                capsLockOn: true,
+                respectExternalSleepPrevention: true
+            )
+        )
+        XCTAssertTrue(
+            SleepStateOwnershipPolicy.shouldRestoreOnTerminate(
+                capsLockOn: false,
+                respectExternalSleepPrevention: false
+            )
+        )
+    }
+}
+
 final class DisplaySleepPolicyTests: XCTestCase {
     func testAllowsDisplaySleepWithoutExternalDisplay() {
         XCTAssertTrue(DisplaySleepPolicy.shouldRequestDisplaySleep(externalDisplayConnected: false))

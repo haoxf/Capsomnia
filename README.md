@@ -26,7 +26,7 @@ Current version: `3.1.1`
 
 Capsomnia is a small macOS menu bar app that turns Caps Lock into a physical keep-awake switch for closed-lid MacBook work.
 
-Turn Caps Lock on when local work should keep running. Turn Caps Lock off when you want normal sleep behavior back.
+Turn Caps Lock on when local work should keep running. Turn Caps Lock off to release Capsomnia's control; another sleep controller may still keep the Mac awake.
 
 It is useful for AI agents, mobile access, and other long-running or remote work.
 
@@ -74,10 +74,10 @@ The source installer builds `Capsomnia.app` locally, places it in `~/Application
 - Prevent all-caps typing (optional): when Capsomnia is on, Caps Lock no longer forces uppercase input. Shift still types uppercase letters.
 - Caps Lock on: keeps AI agents and other work from being interrupted when the MacBook lid is closed. Remote operation through tools such as Codex Mobile remains possible. The Caps Lock light physically shows the current state.
 - Custom toggle shortcut: turn Capsomnia on or off with another key combination even if Caps Lock is assigned elsewhere. The green Caps Lock light continues to show the current state.
-- Auto-off timer (optional): choose a preset from 15 minutes to 8 hours or a custom duration from 1 minute to 24 hours. When time expires, Capsomnia turns off, confirms that sleep prevention is released, and immediately puts the Mac to sleep.
-- Caps Lock off: restores normal sleep behavior.
+- Auto-off timer (optional): choose a preset from 15 minutes to 8 hours or a custom duration from 1 minute to 24 hours. When time expires, Capsomnia turns off. It requests immediate sleep only when external-controller compatibility is disabled.
+- Caps Lock off: releases Capsomnia's sleep prevention once. With external-controller compatibility enabled, another app may enable sleep prevention afterward without Capsomnia overwriting it.
 - Lid closed while Capsomnia is on: puts the display to sleep only when no external display is connected, while work keeps running.
-- Quitting the app restores normal sleep behavior.
+- Quitting while Capsomnia is on releases its sleep prevention. Quitting while it is already off leaves an external controller's state unchanged in compatibility mode.
 
 Capsomnia is useful for long-running local jobs, AI coding agents, SSH sessions, builds, downloads, and unattended scripts.
 
@@ -86,7 +86,7 @@ Capsomnia is useful for long-running local jobs, AI coding agents, SSH sessions,
 - Ensure sufficient airflow and use a stable power source.
 - Closed-lid use while sleep prevention is active may increase heat and battery consumption.
 - Do not rely on Capsomnia for critical jobs or as a substitute for backups.
-- The auto-off timer explicitly puts the Mac to sleep when it expires. Save work and choose a duration long enough for the task to finish.
+- The auto-off timer explicitly puts the Mac to sleep when compatibility mode is disabled. Save work and choose a duration long enough for the task to finish.
 - Turn Caps Lock off after use and confirm that normal sleep behavior has returned.
 - Use Capsomnia at your own risk. Compatibility is not guaranteed for every Mac, macOS version, or environment.
 
@@ -98,7 +98,7 @@ On first launch, Capsomnia explains how the Caps Lock switch works and lets you 
 - whether to prevent all-caps typing while Capsomnia is on
 - English, Japanese, Simplified Chinese, or Korean
 
-"Turn display off when lid closes" and "Open at login" are enabled by default and do not appear in initial setup. Open Capsomnia again later to change all settings. Advanced Settings includes the optional auto-off timer and a global shortcut that toggles Capsomnia through the real Caps Lock state. The timer is off by default. Each time Capsomnia is enabled, the selected duration starts from the beginning; the restart button resets the current countdown. "Show menu bar icon" remains independent when "Prevent all-caps typing" is enabled. If the icon is hidden, a red dot appears temporarily when an error occurs.
+"Turn display off when lid closes", "Respect external sleep controllers", and "Open at login" are enabled by default and do not appear in initial setup. Open Capsomnia again later to change all settings. Compatibility mode writes `SleepDisabled=0` once when Capsomnia turns off, then accepts a later `1` as owned by another controller; the off indicator stays gray and its tooltip explains the external state. Advanced Settings also includes the optional auto-off timer and a global shortcut that toggles Capsomnia through the real Caps Lock state. The timer is off by default. Each time Capsomnia is enabled, the selected duration starts from the beginning; the restart button resets the current countdown. "Show menu bar icon" remains independent when "Prevent all-caps typing" is enabled. If the icon is hidden, a red dot appears temporarily when an error occurs.
 
 macOS Accessibility permission is required only when "Prevent all-caps typing" is enabled. Capsomnia installs a local Core Graphics event filter that removes only the Caps Lock modifier from keyboard events; it does not store keyboard input or send it anywhere. If permission is missing or the filter stops, Capsomnia fails closed: sleep prevention is turned off, the menu bar dot turns red, and the app retries. When this setting is disabled, Accessibility permission is not required and Capsomnia only checks the local Caps Lock state every 250 milliseconds.
 
@@ -150,7 +150,7 @@ The uninstaller unloads the LaunchAgent, stops Capsomnia, removes `Capsomnia.app
 
 Capsomnia's menu bar app does not run as root. System sleep settings require elevated privileges, so Capsomnia uses a small fixed native helper through passwordless `sudo`. The helper is a compiled executable and does not invoke a shell or load shell startup files.
 
-Package-installed app files, the helper, and the system LaunchAgent are owned by `root:wheel`. The packaged helper is also signed with the same Developer ID as the app. Capsomnia verifies the actual `SleepDisabled` state after every change and every ten seconds afterward. If the helper cannot apply a change, the state cannot be verified, or the setting drifts, the menu bar dot turns red and Capsomnia retries after five seconds instead of showing the requested state as active. The red error dot appears temporarily even if the menu bar icon is normally hidden.
+Package-installed app files, the helper, and the system LaunchAgent are owned by `root:wheel`. The packaged helper is also signed with the same Developer ID as the app. Capsomnia verifies the actual `SleepDisabled` state after every change and every ten seconds afterward. If the helper cannot apply a change, the state cannot be verified, or the setting drifts, the menu bar dot turns red and Capsomnia retries after five seconds instead of showing the requested state as active. The exception is off-state drift to `SleepDisabled=1` while external-controller compatibility is enabled: Capsomnia accepts that value without rewriting it. The red error dot appears temporarily even if the menu bar icon is normally hidden.
 
 When "Prevent all-caps typing" is disabled, Capsomnia does not request Input Monitoring or inspect keyboard events. When it is enabled, a local active Core Graphics event filter uses Accessibility permission only to remove `.maskAlphaShift` and suppress the Caps Lock modifier-change event. It does not log event contents, persist them, or send them over the network. Capsomnia still reads the physical Caps Lock state every 250 milliseconds to control sleep.
 
@@ -174,7 +174,7 @@ The sudoers rule is limited to those three exact commands. The helper only accep
 /usr/bin/pmset displaysleepnow
 ```
 
-After an auto-off timer has successfully turned Caps Lock off and confirmed `SleepDisabled=0`, the app runs `/usr/bin/pmset sleepnow` directly as the current user. This immediate sleep request does not use `sudo` and does not expand the helper or sudoers permissions.
+When external-controller compatibility is disabled, an auto-off timer that successfully turns Caps Lock off and confirms `SleepDisabled=0` runs `/usr/bin/pmset sleepnow` directly as the current user. Compatibility mode cancels that immediate sleep request. The command does not use `sudo` and does not expand the helper or sudoers permissions.
 
 ## Logs and Troubleshooting
 

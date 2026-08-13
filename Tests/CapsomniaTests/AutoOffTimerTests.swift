@@ -98,6 +98,22 @@ final class AutoOffPolicyTests: XCTestCase {
 }
 
 final class AutoOffSleepCoordinatorTests: XCTestCase {
+    func testCompatibilityModeCanCancelPendingSystemSleep() {
+        var sleepRequestCount = 0
+        let coordinator = AutoOffSleepCoordinator {
+            sleepRequestCount += 1
+            return (0, "", "")
+        }
+
+        coordinator.recordCapsLockResult(.changed(to: false))
+
+        XCTAssertTrue(coordinator.cancelPending())
+        XCTAssertFalse(coordinator.isPending)
+        XCTAssertNil(coordinator.requestSleepIfReady(capsLockOn: false))
+        XCTAssertEqual(sleepRequestCount, 0)
+        XCTAssertFalse(coordinator.cancelPending())
+    }
+
     func testSuccessfulAutoOffSleepsOnceAfterConfirmedOff() {
         var sleepRequestCount = 0
         let coordinator = AutoOffSleepCoordinator {

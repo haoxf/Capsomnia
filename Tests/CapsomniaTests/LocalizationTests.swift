@@ -29,6 +29,8 @@ final class LocalizationTests: XCTestCase {
             XCTAssertFalse(strings.displaySleepOnLidClose.isEmpty)
             XCTAssertFalse(strings.ignoreExternalCapsLockOffWhileLidClosed.isEmpty)
             XCTAssertFalse(strings.ignoreExternalCapsLockOffWhileLidClosedDesc.isEmpty)
+            XCTAssertFalse(strings.respectExternalSleepPrevention.isEmpty)
+            XCTAssertFalse(strings.respectExternalSleepPreventionDesc.isEmpty)
             XCTAssertFalse(strings.openAtLogin.isEmpty)
             XCTAssertFalse(strings.language.isEmpty)
             XCTAssertFalse(strings.advancedSettings.isEmpty)
@@ -42,6 +44,7 @@ final class LocalizationTests: XCTestCase {
             XCTAssertFalse(strings.initialPreferencesHeading.isEmpty)
             XCTAssertFalse(strings.done.isEmpty)
             XCTAssertFalse(strings.tooltipDedicatedPermission.isEmpty)
+            XCTAssertFalse(strings.tooltipExternalSleepPrevention.isEmpty)
         }
     }
 

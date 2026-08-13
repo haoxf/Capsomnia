@@ -94,6 +94,8 @@ struct AppStrings {
     let displaySleepOnLidCloseDesc: String
     let ignoreExternalCapsLockOffWhileLidClosed: String
     let ignoreExternalCapsLockOffWhileLidClosedDesc: String
+    let respectExternalSleepPrevention: String
+    let respectExternalSleepPreventionDesc: String
     let autoOffTimer: String
     let autoOffTimerDesc: String
     let autoOffOff: String
@@ -123,6 +125,7 @@ struct AppStrings {
     let getStarted: String
     let tooltipOn: String
     let tooltipOff: String
+    let tooltipExternalSleepPrevention: String
     let tooltipError: String
     let tooltipDedicatedPermission: String
 
@@ -148,8 +151,10 @@ struct AppStrings {
                 displaySleepOnLidCloseDesc: "When Capsomnia is on, let the display sleep after closing the lid only if no external display is connected.",
                 ignoreExternalCapsLockOffWhileLidClosed: "Ignore Caps Lock turn-offs while the lid is closed",
                 ignoreExternalCapsLockOffWhileLidClosedDesc: "While the lid is closed, sleep prevention stays on even if Caps Lock is turned off — for example by a remote desktop client syncing its keyboard state. The menu bar, the toggle shortcut, and the auto-off timer still turn it off.",
+                respectExternalSleepPrevention: "Respect external sleep controllers",
+                respectExternalSleepPreventionDesc: "When Capsomnia is off, release sleep prevention once without overriding another app that enables it later.",
                 autoOffTimer: "Auto-off timer",
-                autoOffTimerDesc: "After the set time, Capsomnia turns awake mode off and puts your Mac to sleep.",
+                autoOffTimerDesc: "After the set time, Capsomnia turns awake mode off. Immediate sleep is skipped while external-controller compatibility is enabled.",
                 autoOffOff: "Off",
                 autoOffCustom: "Custom",
                 autoOffTurnsOffIn: "Turns off in",
@@ -170,13 +175,14 @@ struct AppStrings {
                 explainerOnTitle: "Caps Lock on",
                 explainerOnDesc: "System sleep is disabled — work keeps running, lid open or closed.",
                 explainerOffTitle: "Caps Lock off",
-                explainerOffDesc: "Normal sleep behavior resumes.",
+                explainerOffDesc: "Capsomnia releases its control. Another sleep controller may still keep the Mac awake.",
                 initialPreferencesHeading: "Initial setup",
                 preferencesHeading: "Preferences",
                 done: "Done",
                 getStarted: "Get started",
                 tooltipOn: "Caps Lock ON: processes stay awake",
                 tooltipOff: "Caps Lock OFF: normal sleep",
+                tooltipExternalSleepPrevention: "Caps Lock OFF: another controller is preventing sleep",
                 tooltipError: "Capsomnia could not update the sleep setting — retrying",
                 tooltipDedicatedPermission: "“Prevent all-caps typing” requires Accessibility permission — sleep prevention is off"
             )
@@ -196,8 +202,10 @@ struct AppStrings {
                 displaySleepOnLidCloseDesc: "Capsomnia가 켜진 상태에서 덮개를 닫으면 외부 디스플레이가 연결되지 않은 경우에만 화면을 끕니다.",
                 ignoreExternalCapsLockOffWhileLidClosed: "덮개를 닫은 동안 Caps Lock에 의한 끄기 무시",
                 ignoreExternalCapsLockOffWhileLidClosedDesc: "덮개가 닫혀 있는 동안에는 Caps Lock이 꺼져도 잠자기 방지를 유지합니다. 원격 데스크톱 연결 등으로 의도치 않게 해제되는 것을 방지합니다. 메뉴 막대, 전환 단축키, 자동 종료 타이머로는 평소대로 끌 수 있습니다.",
+                respectExternalSleepPrevention: "외부 잠자기 제어 존중",
+                respectExternalSleepPreventionDesc: "Capsomnia가 꺼지면 잠자기 방지를 한 번만 해제하고, 이후 다른 앱이 다시 켠 상태를 덮어쓰지 않습니다.",
                 autoOffTimer: "자동 종료 타이머",
-                autoOffTimerDesc: "설정한 시간이 지나면 절전 방지를 끄고 Mac을 잠자기 상태로 전환합니다.",
+                autoOffTimerDesc: "설정한 시간이 지나면 절전 방지를 끕니다. 외부 제어기 호환 모드에서는 즉시 잠자기를 요청하지 않습니다.",
                 autoOffOff: "끄기",
                 autoOffCustom: "사용자 지정",
                 autoOffTurnsOffIn: "종료까지",
@@ -218,13 +226,14 @@ struct AppStrings {
                 explainerOnTitle: "Caps Lock 켜기",
                 explainerOnDesc: "시스템 잠자기를 막습니다. 덮개를 닫아도 작업은 계속됩니다.",
                 explainerOffTitle: "Caps Lock 끄기",
-                explainerOffDesc: "평소 잠자기 동작으로 돌아갑니다.",
+                explainerOffDesc: "Capsomnia의 제어를 해제합니다. 다른 잠자기 제어기가 Mac을 계속 깨워 둘 수 있습니다.",
                 initialPreferencesHeading: "초기 설정",
                 preferencesHeading: "기본 설정",
                 done: "완료",
                 getStarted: "시작하기",
                 tooltipOn: "Caps Lock 켜짐: 잠자기 방지 중",
                 tooltipOff: "Caps Lock 꺼짐: 평소 잠자기",
+                tooltipExternalSleepPrevention: "Caps Lock 꺼짐: 다른 제어기가 잠자기를 막고 있습니다",
                 tooltipError: "잠자기 설정을 바꾸지 못했습니다. 다시 시도 중입니다.",
                 tooltipDedicatedPermission: "대문자 고정 방지 기능에는 손쉬운 사용 권한이 필요합니다. 잠자기 방지는 꺼져 있습니다."
             )
@@ -244,8 +253,10 @@ struct AppStrings {
                 displaySleepOnLidCloseDesc: "Capsomnia ON中は、外部ディスプレイが接続されていない場合のみ、蓋を閉じたら画面を暗くします。",
                 ignoreExternalCapsLockOffWhileLidClosed: "蓋を閉じている間はCaps Lockによるオフを無視",
                 ignoreExternalCapsLockOffWhileLidClosedDesc: "蓋を閉じている間は、Caps Lockがオフになってもスリープ抑止を維持します。リモートデスクトップ接続などで意図せず解除されるのを防ぎます。メニューバー・切り替えショートカット・自動オフタイマーからは通常どおりオフにできます。",
+                respectExternalSleepPrevention: "外部のスリープ制御を尊重",
+                respectExternalSleepPreventionDesc: "Capsomniaをオフにした際は一度だけスリープ抑止を解除し、その後ほかのアプリが有効にした状態を上書きしません。",
                 autoOffTimer: "自動オフタイマー",
-                autoOffTimerDesc: "設定した時間が経過すると、スリープ抑止を解除してMacをスリープさせます。",
+                autoOffTimerDesc: "設定時間後にスリープ抑止を解除します。外部コントローラ互換が有効な間は即時スリープを要求しません。",
                 autoOffOff: "オフ",
                 autoOffCustom: "カスタム",
                 autoOffTurnsOffIn: "オフまで",
@@ -266,13 +277,14 @@ struct AppStrings {
                 explainerOnTitle: "Caps Lock ON",
                 explainerOnDesc: "システムスリープを無効化。蓋を閉じても作業が走り続けます。",
                 explainerOffTitle: "Caps Lock OFF",
-                explainerOffDesc: "通常のスリープ動作に戻ります。",
+                explainerOffDesc: "Capsomniaの制御を解除します。ほかのコントローラがMacを起動状態に保つ場合があります。",
                 initialPreferencesHeading: "初期設定",
                 preferencesHeading: "環境設定",
                 done: "完了",
                 getStarted: "はじめる",
                 tooltipOn: "Caps Lock ON: スリープ抑止中",
                 tooltipOff: "Caps Lock OFF: 通常のスリープ動作",
+                tooltipExternalSleepPrevention: "Caps Lock OFF: ほかのコントローラがスリープを抑止中",
                 tooltipError: "スリープ設定を更新できませんでした — 再試行中",
                 tooltipDedicatedPermission: "「大文字固定を防ぐ」にはアクセシビリティ権限が必要です — スリープ抑止OFF"
             )
@@ -292,8 +304,10 @@ struct AppStrings {
                 displaySleepOnLidCloseDesc: "Capsomnia 开启时，仅在未连接外接显示器的情况下，合盖后让显示屏进入睡眠。",
                 ignoreExternalCapsLockOffWhileLidClosed: "合盖期间忽略 Caps Lock 的关闭操作",
                 ignoreExternalCapsLockOffWhileLidClosedDesc: "合盖期间，即使 Caps Lock 被关闭也会保持防睡眠，防止远程桌面连接等意外解除防睡眠。菜单栏、切换快捷键和自动关闭定时器仍可正常关闭。",
+                respectExternalSleepPrevention: "尊重外部睡眠控制器",
+                respectExternalSleepPreventionDesc: "Capsomnia 关闭时只解除一次防睡眠，之后不再覆盖其他应用重新启用的状态。",
                 autoOffTimer: "自动关闭定时器",
-                autoOffTimerDesc: "设定时间结束后会关闭防睡眠并让 Mac 进入睡眠。",
+                autoOffTimerDesc: "设定时间结束后会关闭防睡眠。启用外部控制器兼容时不会立即请求系统睡眠。",
                 autoOffOff: "关闭",
                 autoOffCustom: "自定义",
                 autoOffTurnsOffIn: "剩余",
@@ -314,13 +328,14 @@ struct AppStrings {
                 explainerOnTitle: "Caps Lock 已开启",
                 explainerOnDesc: "系统睡眠已停用——无论开盖还是合盖，任务都会继续运行。",
                 explainerOffTitle: "Caps Lock 已关闭",
-                explainerOffDesc: "已恢复正常睡眠。",
+                explainerOffDesc: "Capsomnia 已解除自身控制；其他睡眠控制器仍可能让 Mac 保持唤醒。",
                 initialPreferencesHeading: "初始设置",
                 preferencesHeading: "偏好设置",
                 done: "完成",
                 getStarted: "开始使用",
                 tooltipOn: "Caps Lock 已开启：任务将保持运行",
                 tooltipOff: "Caps Lock 已关闭：正常睡眠",
+                tooltipExternalSleepPrevention: "Caps Lock 已关闭：其他控制器正在阻止睡眠",
                 tooltipError: "Capsomnia 无法更新睡眠设置——正在重试",
                 tooltipDedicatedPermission: "“防止输入锁定为大写”需要辅助功能权限——睡眠防止已关闭"
             )

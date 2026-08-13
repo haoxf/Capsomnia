@@ -4,6 +4,10 @@ All notable changes to Capsomnia will be documented in this file.
 
 ## Unreleased
 
+- Add an external-controller compatibility setting, enabled by default, that releases sleep prevention once when Capsomnia turns off but does not repeatedly overwrite another controller that later sets `SleepDisabled=1`.
+- Show the normal off indicator with an explanatory tooltip when another controller owns sleep prevention, instead of treating that state as an error.
+- Skip the auto-off timer's immediate system-sleep request and off-state exit cleanup while compatibility mode is enabled, preventing Capsomnia from overriding active external work.
+
 ## 3.1.1 - 2026-08-16
 
 - Prevent reselecting the current auto-off preset or opening and closing the unchanged Custom editor from restarting an active countdown. Use the existing Restart action for intentional resets. (#84)

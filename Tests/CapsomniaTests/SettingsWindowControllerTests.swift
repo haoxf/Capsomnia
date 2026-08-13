@@ -168,6 +168,8 @@ final class SettingsWindowControllerTests: XCTestCase {
             strings.language,
             strings.systemBehavior.uppercased(),
             strings.displaySleepOnLidClose,
+            strings.ignoreExternalCapsLockOffWhileLidClosed,
+            strings.respectExternalSleepPrevention,
             strings.openAtLogin,
             strings.autoOffTimer.uppercased(),
             strings.autoOffOff,
@@ -177,6 +179,15 @@ final class SettingsWindowControllerTests: XCTestCase {
             strings.keyboardShortcutDesc
         ] {
             XCTAssertTrue(renderedText.contains(expected), "Missing rendered text: \(expected)")
+        }
+        for label in visibleLabels where !label.stringValue.isEmpty {
+            let frame = label.convert(label.bounds, to: contentView)
+            XCTAssertGreaterThanOrEqual(frame.minX, -1, "\(label.stringValue) starts outside the window")
+            XCTAssertGreaterThanOrEqual(frame.minY, -1, "\(label.stringValue) starts below the window")
+            XCTAssertLessThanOrEqual(frame.maxX, contentView.bounds.maxX + 1,
+                                     "\(label.stringValue) extends outside the window")
+            XCTAssertLessThanOrEqual(frame.maxY, contentView.bounds.maxY + 1,
+                                     "\(label.stringValue) extends above the window")
         }
 
         let preferencesHeading = try XCTUnwrap(
@@ -426,6 +437,7 @@ final class SettingsWindowControllerTests: XCTestCase {
             onLaunchAtLoginChange: { _ in },
             onDisplaySleepOnLidCloseChange: { _ in },
             onIgnoreExternalCapsLockOffWhileLidClosedChange: { _ in },
+            onRespectExternalSleepPreventionChange: { _ in },
             onAutoOffMinutesChange: onAutoOffMinutesChange,
             onAutoOffRestart: {},
             autoOffDisplayProvider: autoOffDisplayProvider,
