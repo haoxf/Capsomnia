@@ -9,6 +9,8 @@ private enum PreferenceKey {
     static let ignoreExternalCapsLockOffWhileLidClosed = "IgnoreExternalCapsLockOffWhileLidClosed"
     static let respectExternalSleepPrevention = "RespectExternalSleepPrevention"
     static let autoOffMinutes = "AutoOffMinutes"
+    static let autoOffUntilEnabled = "AutoOffUntilEnabled"
+    static let autoOffUntilMinutes = "AutoOffUntilMinutes"
     static let shortcutKeyCode = "ShortcutKeyCode"
     static let shortcutModifiers = "ShortcutModifiers"
     static let shortcutKey = "ShortcutKey"
@@ -29,6 +31,8 @@ enum Preferences {
             PreferenceKey.ignoreExternalCapsLockOffWhileLidClosed: false,
             PreferenceKey.respectExternalSleepPrevention: true,
             PreferenceKey.autoOffMinutes: 0,
+            PreferenceKey.autoOffUntilEnabled: false,
+            PreferenceKey.autoOffUntilMinutes: AutoOffPreset.defaultUntilMinutesFromMidnight,
             PreferenceKey.didCompleteInitialSetup: false,
             PreferenceKey.forceWelcomeOnNextLaunch: false
         ])
@@ -93,6 +97,46 @@ enum Preferences {
         set {
             let clamped = min(max(newValue, 0), AutoOffPreset.maxCustomMinutes)
             defaults.set(clamped, forKey: PreferenceKey.autoOffMinutes)
+        }
+    }
+
+    static var autoOffUntilEnabled: Bool {
+        get { defaults.bool(forKey: PreferenceKey.autoOffUntilEnabled) }
+        set { defaults.set(newValue, forKey: PreferenceKey.autoOffUntilEnabled) }
+    }
+
+    /// Minutes from midnight for the Until schedule (`0...1439`).
+    static var autoOffUntilMinutes: Int {
+        get {
+            AutoOffPreset.clampedUntilMinutes(defaults.integer(forKey: PreferenceKey.autoOffUntilMinutes))
+        }
+        set {
+            defaults.set(AutoOffPreset.clampedUntilMinutes(newValue), forKey: PreferenceKey.autoOffUntilMinutes)
+        }
+    }
+
+    /// Duration and clock-time are mutually exclusive. Existing duration
+    /// values stay stored while Until is selected so switching back restores them.
+    static var autoOffSchedule: AutoOffSchedule {
+        get {
+            if autoOffUntilEnabled {
+                return .until(minutesFromMidnight: autoOffUntilMinutes)
+            }
+            let minutes = autoOffMinutes
+            return minutes == 0 ? .off : .duration(minutes: minutes)
+        }
+        set {
+            switch AutoOffSchedule.clamped(newValue) {
+            case .off:
+                autoOffUntilEnabled = false
+                autoOffMinutes = 0
+            case .duration(let minutes):
+                autoOffUntilEnabled = false
+                autoOffMinutes = minutes
+            case .until(let minutes):
+                autoOffUntilEnabled = true
+                autoOffUntilMinutes = minutes
+            }
         }
     }
 

@@ -6,6 +6,12 @@ enum SettingsPage {
     case advancedSettings
 }
 
+enum SettingsEntryPolicy {
+    static func page(didCompleteInitialSetup: Bool) -> SettingsPage {
+        didCompleteInitialSetup ? .advancedSettings : .initialPreferences
+    }
+}
+
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private static let settingsContentWidth: CGFloat = 400
     private static let advancedContentWidth: CGFloat = 920
@@ -42,7 +48,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let advancedSettingsButton = DisclosureButton()
 
     private let autoOffHeading = brandLabel(size: 11, weight: .semibold, color: Brand.textFaint)
-    private let autoOffControl = AutoOffTimerControl(minutes: Preferences.autoOffMinutes)
+    private let autoOffControl = AutoOffTimerControl(schedule: Preferences.autoOffSchedule)
 
     private let systemBehaviorHeading = brandLabel(
         size: 11,
@@ -129,7 +135,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let onDisplaySleepOnLidCloseChange: (Bool) -> Void
     private let onIgnoreExternalCapsLockOffWhileLidClosedChange: (Bool) -> Void
     private let onRespectExternalSleepPreventionChange: (Bool) -> Void
-    private let onAutoOffMinutesChange: (Int) -> Void
+    private let onAutoOffScheduleChange: (AutoOffSchedule) -> Void
     private let onAutoOffRestart: () -> Void
     private let autoOffDisplayProvider: () -> AutoOffDisplayState
     private let onKeyboardShortcutChange: (KeyboardShortcut?) -> Bool
@@ -145,7 +151,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         onDisplaySleepOnLidCloseChange: @escaping (Bool) -> Void,
         onIgnoreExternalCapsLockOffWhileLidClosedChange: @escaping (Bool) -> Void,
         onRespectExternalSleepPreventionChange: @escaping (Bool) -> Void,
-        onAutoOffMinutesChange: @escaping (Int) -> Void,
+        onAutoOffScheduleChange: @escaping (AutoOffSchedule) -> Void,
         onAutoOffRestart: @escaping () -> Void,
         autoOffDisplayProvider: @escaping () -> AutoOffDisplayState,
         onKeyboardShortcutChange: @escaping (KeyboardShortcut?) -> Bool,
@@ -159,7 +165,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         self.onDisplaySleepOnLidCloseChange = onDisplaySleepOnLidCloseChange
         self.onIgnoreExternalCapsLockOffWhileLidClosedChange = onIgnoreExternalCapsLockOffWhileLidClosedChange
         self.onRespectExternalSleepPreventionChange = onRespectExternalSleepPreventionChange
-        self.onAutoOffMinutesChange = onAutoOffMinutesChange
+        self.onAutoOffScheduleChange = onAutoOffScheduleChange
         self.onAutoOffRestart = onAutoOffRestart
         self.autoOffDisplayProvider = autoOffDisplayProvider
         self.onKeyboardShortcutChange = onKeyboardShortcutChange
@@ -247,6 +253,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             desc: strings.autoOffTimerDesc,
             off: strings.autoOffOff,
             custom: strings.autoOffCustom,
+            until: strings.autoOffUntil,
             turnsOffIn: strings.autoOffTurnsOffIn,
             hours: strings.autoOffHours,
             minutesUnit: strings.autoOffMinutesUnit,
@@ -701,8 +708,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func buildAutoOffCard() -> NSView {
-        autoOffControl.onMinutesChange = { [weak self] minutes in
-            self?.onAutoOffMinutesChange(minutes)
+        autoOffControl.onScheduleChange = { [weak self] schedule in
+            self?.onAutoOffScheduleChange(schedule)
         }
         autoOffControl.displayProvider = autoOffDisplayProvider
         autoOffControl.onRestart = { [weak self] in
@@ -729,7 +736,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         respectExternalSleepPreventionToggle.setOn(Preferences.respectExternalSleepPrevention)
         openAtLoginToggle.setOn(Preferences.launchAtLogin)
         shortcutRecorder.setShortcut(Preferences.keyboardShortcut)
-        autoOffControl.setMinutes(Preferences.autoOffMinutes)
+        autoOffControl.setSchedule(Preferences.autoOffSchedule)
     }
 
     private func configureAdvancedHeader() {

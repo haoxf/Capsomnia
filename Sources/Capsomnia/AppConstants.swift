@@ -100,6 +100,7 @@ struct AppStrings {
     let autoOffTimerDesc: String
     let autoOffOff: String
     let autoOffCustom: String
+    let autoOffUntil: String
     let autoOffTurnsOffIn: String
     let autoOffHours: String
     let autoOffMinutesUnit: String
@@ -154,9 +155,10 @@ struct AppStrings {
                 respectExternalSleepPrevention: "Respect external sleep controllers",
                 respectExternalSleepPreventionDesc: "When Capsomnia is off, release sleep prevention once without overriding another app that enables it later.",
                 autoOffTimer: "Auto-off timer",
-                autoOffTimerDesc: "After the set time, Capsomnia turns awake mode off. Immediate sleep is skipped while external-controller compatibility is enabled.",
+                autoOffTimerDesc: "After the set duration or clock time, Capsomnia turns awake mode off. Immediate sleep is skipped while external-controller compatibility is enabled.",
                 autoOffOff: "Off",
                 autoOffCustom: "Custom",
+                autoOffUntil: "Until",
                 autoOffTurnsOffIn: "Turns off in",
                 autoOffHours: "Hours",
                 autoOffMinutesUnit: "Minutes",
@@ -205,9 +207,10 @@ struct AppStrings {
                 respectExternalSleepPrevention: "외부 잠자기 제어 존중",
                 respectExternalSleepPreventionDesc: "Capsomnia가 꺼지면 잠자기 방지를 한 번만 해제하고, 이후 다른 앱이 다시 켠 상태를 덮어쓰지 않습니다.",
                 autoOffTimer: "자동 종료 타이머",
-                autoOffTimerDesc: "설정한 시간이 지나면 절전 방지를 끕니다. 외부 제어기 호환 모드에서는 즉시 잠자기를 요청하지 않습니다.",
+                autoOffTimerDesc: "설정한 시간 또는 시각이 되면 절전 방지를 끕니다. 외부 제어기 호환 모드에서는 즉시 잠자기를 요청하지 않습니다.",
                 autoOffOff: "끄기",
                 autoOffCustom: "사용자 지정",
+                autoOffUntil: "시각",
                 autoOffTurnsOffIn: "종료까지",
                 autoOffHours: "시간",
                 autoOffMinutesUnit: "분",
@@ -256,9 +259,10 @@ struct AppStrings {
                 respectExternalSleepPrevention: "外部のスリープ制御を尊重",
                 respectExternalSleepPreventionDesc: "Capsomniaをオフにした際は一度だけスリープ抑止を解除し、その後ほかのアプリが有効にした状態を上書きしません。",
                 autoOffTimer: "自動オフタイマー",
-                autoOffTimerDesc: "設定時間後にスリープ抑止を解除します。外部コントローラ互換が有効な間は即時スリープを要求しません。",
+                autoOffTimerDesc: "設定した時間または時刻になるとスリープ抑止を解除します。外部コントローラ互換が有効な間は即時スリープを要求しません。",
                 autoOffOff: "オフ",
                 autoOffCustom: "カスタム",
+                autoOffUntil: "時刻",
                 autoOffTurnsOffIn: "オフまで",
                 autoOffHours: "時間",
                 autoOffMinutesUnit: "分",
@@ -307,9 +311,10 @@ struct AppStrings {
                 respectExternalSleepPrevention: "尊重外部睡眠控制器",
                 respectExternalSleepPreventionDesc: "Capsomnia 关闭时只解除一次防睡眠，之后不再覆盖其他应用重新启用的状态。",
                 autoOffTimer: "自动关闭定时器",
-                autoOffTimerDesc: "设定时间结束后会关闭防睡眠。启用外部控制器兼容时不会立即请求系统睡眠。",
+                autoOffTimerDesc: "设定时长或到点后会关闭防睡眠。启用外部控制器兼容时不会立即请求系统睡眠。",
                 autoOffOff: "关闭",
                 autoOffCustom: "自定义",
+                autoOffUntil: "到点",
                 autoOffTurnsOffIn: "剩余",
                 autoOffHours: "小时",
                 autoOffMinutesUnit: "分钟",

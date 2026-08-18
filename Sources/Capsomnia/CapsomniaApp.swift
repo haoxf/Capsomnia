@@ -448,14 +448,14 @@ final class Capsomnia: NSObject, NSApplicationDelegate {
                 onRespectExternalSleepPreventionChange: { [weak self] enabled in
                     self?.setRespectExternalSleepPrevention(enabled)
                 },
-                onAutoOffMinutesChange: { [weak self] minutes in
-                    self?.setAutoOffMinutes(minutes)
+                onAutoOffScheduleChange: { [weak self] schedule in
+                    self?.setAutoOffSchedule(schedule)
                 },
                 onAutoOffRestart: { [weak self] in
                     self?.restartAutoOff()
                 },
                 autoOffDisplayProvider: { [weak self] in
-                    self?.autoOffDisplayState() ?? .idle(minutes: 0)
+                    self?.autoOffDisplayState() ?? .idle(.off)
                 },
                 onKeyboardShortcutChange: { [weak self] shortcut in
                     self?.setKeyboardShortcut(shortcut) ?? false
@@ -474,7 +474,7 @@ final class Capsomnia: NSObject, NSApplicationDelegate {
     }
 
     private func currentSettingsPage() -> SettingsPage {
-        Preferences.didCompleteInitialSetup ? .settings : .initialPreferences
+        SettingsEntryPolicy.page(didCompleteInitialSetup: Preferences.didCompleteInitialSetup)
     }
 
     private func setShowMenuBarIcon(_ enabled: Bool) {
@@ -560,7 +560,7 @@ final class Capsomnia: NSObject, NSApplicationDelegate {
     private func evaluateAutoOff(capsLockOn: Bool, reason: String) -> Bool {
         let result = AutoOffPolicy.evaluate(
             capsLockOn: capsLockOn,
-            autoOffMinutes: Preferences.autoOffMinutes,
+            schedule: Preferences.autoOffSchedule,
             now: Date(),
             state: autoOffState
         )
@@ -589,11 +589,13 @@ final class Capsomnia: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func setAutoOffMinutes(_ minutes: Int) {
-        Preferences.autoOffMinutes = minutes
-        // Start fresh with the newly chosen duration.
+    private func setAutoOffSchedule(_ schedule: AutoOffSchedule) {
+        let next = AutoOffSchedule.clamped(schedule)
+        guard Preferences.autoOffSchedule != next else { return }
+        Preferences.autoOffSchedule = next
+        // Start fresh with the newly chosen duration or clock time.
         autoOffState = AutoOffState()
-        log("preference auto_off_minutes=\(minutes)")
+        log("preference auto_off_schedule=\(autoOffScheduleLog(next))")
 
         // Let AppKit paint the selected value before querying pmset/helper state,
         // and coalesce rapid +/- clicks so only the final value is re-applied.
@@ -607,30 +609,44 @@ final class Capsomnia: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 
+    private func autoOffScheduleLog(_ schedule: AutoOffSchedule) -> String {
+        switch schedule {
+        case .off:
+            return "off"
+        case .duration(let minutes):
+            return "duration_minutes=\(minutes)"
+        case .until(let minutes):
+            return "until=\(AutoOffFormatter.clockLabel(minutesFromMidnight: minutes))"
+        }
+    }
+
     private func restartAutoOff() {
-        let minutes = Preferences.autoOffMinutes
-        guard minutes > 0 else { return }
+        let schedule = Preferences.autoOffSchedule
+        guard schedule.isArmed else { return }
         autoOffState = AutoOffPolicy.restarted(
             capsLockOn: currentCapsLockState,
-            autoOffMinutes: minutes,
+            schedule: schedule,
             now: Date()
         )
-        log("auto_off restart minutes=\(minutes)")
+        log("auto_off restart schedule=\(autoOffScheduleLog(schedule))")
         applyCurrentCapsLockState(reason: "restart")
     }
 
     private func autoOffDisplayState() -> AutoOffDisplayState {
-        let minutes = Preferences.autoOffMinutes
+        let schedule = Preferences.autoOffSchedule
         guard currentCapsLockState else {
-            return .idle(minutes: minutes)
+            return .idle(schedule)
         }
-        guard minutes > 0 else {
+        guard schedule.isArmed else {
             return .infinite
         }
         if let deadline = autoOffState.deadline {
             return .counting(remaining: max(0, deadline.timeIntervalSinceNow))
         }
-        return .counting(remaining: TimeInterval(minutes) * 60)
+        let remaining = AutoOffPolicy.deadline(for: schedule, now: Date())
+            .map { max(0, $0.timeIntervalSinceNow) }
+            ?? 0
+        return .counting(remaining: remaining)
     }
 
     private func configureGlobalHotKey() {

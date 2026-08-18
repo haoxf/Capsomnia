@@ -4,6 +4,8 @@ All notable changes to Capsomnia will be documented in this file.
 
 ## Unreleased
 
+- Open Advanced Settings directly after initial setup, so the auto-off timer and other advanced controls are visible without an extra click. The compact Settings page remains reachable from Back.
+- Add an Until clock-time option to the auto-off timer. Choosing a time such as 23:00 turns Capsomnia off at the next occurrence of that time; times that have already passed roll to the following day. Duration presets and the custom picker remain available.
 - Add an external-controller compatibility setting, enabled by default, that releases sleep prevention once when Capsomnia turns off but does not repeatedly overwrite another controller that later sets `SleepDisabled=1`.
 - Show the normal off indicator with an explanatory tooltip when another controller owns sleep prevention, instead of treating that state as an error.
 - Skip the auto-off timer's immediate system-sleep request and off-state exit cleanup while compatibility mode is enabled, preventing Capsomnia from overriding active external work.
