@@ -4,7 +4,20 @@ All notable changes to Capsomnia will be documented in this file.
 
 ## Unreleased
 
+- Open Advanced Settings directly after initial setup, so the auto-off timer and other advanced controls are visible without an extra click. The compact Settings page remains reachable from Back.
+- Add an Until clock-time option to the auto-off timer. Choosing a time such as 23:00 turns Capsomnia off at the next occurrence of that time; times that have already passed roll to the following day. Duration presets and the custom picker remain available.
+- Add an external-controller compatibility setting, enabled by default, that releases sleep prevention once when Capsomnia turns off but does not repeatedly overwrite another controller that later sets `SleepDisabled=1`.
+- Show the normal off indicator with an explanatory tooltip when another controller owns sleep prevention, instead of treating that state as an error.
+- Skip the auto-off timer's immediate system-sleep request and off-state exit cleanup while compatibility mode is enabled, preventing Capsomnia from overriding active external work.
+
+## 3.1.1 - 2026-08-16
+
+- Prevent reselecting the current auto-off preset or opening and closing the unchanged Custom editor from restarting an active countdown. Use the existing Restart action for intentional resets. (#84)
+
+## 3.1.0 - 2026-08-13
+
 - Add Intel Mac source-install support for macOS 13.5 or later with Swift 5.9, while keeping the signed and notarized package Apple silicon-only on macOS 14 or later.
+- Add an opt-in "Ignore Caps Lock turn-offs while the lid is closed" setting (default off) to Advanced Settings. While the lid is closed, Caps Lock turn-offs from external sources — such as a remote desktop client syncing its keyboard state to the host — are ignored and Caps Lock is re-asserted, so sleep prevention survives remote sessions. Turn-offs from the menu bar, the registered shortcut, and the auto-off timer stay effective, and opening the lid with Caps Lock off returns to normal sleep behavior. (#75)
 
 ## 3.0.0 - 2026-08-10
 

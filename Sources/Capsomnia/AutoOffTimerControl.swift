@@ -6,21 +6,23 @@ import AppKit
 ///
 /// The control owns no timing logic. It reads the live display state from
 /// `displayProvider` (supplied by the app delegate) on a 1-second tick while the
-/// window is visible, and reports the chosen duration through `onMinutesChange`.
+/// window is visible, and reports the chosen schedule through `onScheduleChange`.
 final class AutoOffTimerControl: NSView {
-    /// Called with the newly selected duration in minutes (`0` == no timer).
-    var onMinutesChange: ((Int) -> Void)?
+    /// Called with the newly selected schedule (`off`, duration, or until).
+    var onScheduleChange: ((AutoOffSchedule) -> Void)?
     /// Supplies the current readout state for the big countdown display.
     var displayProvider: (() -> AutoOffDisplayState)?
     /// Called when the Restart button is pressed.
     var onRestart: (() -> Void)?
 
-    private(set) var minutes: Int
-    /// The value used while the custom section is active; seeded from `minutes`.
+    private(set) var schedule: AutoOffSchedule
+    /// The value used while the custom duration editor is active.
     private var customMinutes: Int
-    /// Whether the custom value is selected. Tracked explicitly so that stepping
-    /// onto a value that happens to equal a preset does not collapse the editor.
+    /// The value used while the Until editor is active.
+    private var untilMinutes: Int
+    /// Tracked explicitly so stepping onto a preset duration does not collapse Custom.
     private var isCustom: Bool
+    private var isUntil: Bool
 
     private let descLabel = brandLabel(size: 12, color: Brand.textDim, wraps: true)
     private let captionLabel = brandLabel(size: 11, weight: .semibold, color: Brand.textFaint)
@@ -32,6 +34,7 @@ final class AutoOffTimerControl: NSView {
 
     private var offChip: AutoOffChip!
     private var customChip: AutoOffChip!
+    private var untilChip: AutoOffChip!
     private var presetChips: [(minutes: Int, chip: AutoOffChip)] = []
 
     private let customPopover = NSPopover()
@@ -41,14 +44,36 @@ final class AutoOffTimerControl: NSView {
     private let hoursUnitLabel = brandLabel(size: 12, weight: .medium, color: Brand.textDim)
     private let minutesUnitLabel = brandLabel(size: 12, weight: .medium, color: Brand.textDim)
 
+    private let untilPopover = NSPopover()
+    private let untilEditor = NSView()
+    private let untilHoursValueLabel = AutoOffTimerControl.makeValueLabel()
+    private let untilMinutesValueLabel = AutoOffTimerControl.makeValueLabel()
+    private let untilHoursUnitLabel = brandLabel(size: 12, weight: .medium, color: Brand.textDim)
+    private let untilMinutesUnitLabel = brandLabel(size: 12, weight: .medium, color: Brand.textDim)
+
     private var turnsOffInText = "Turns off in"
     private var displayTimer: Timer?
 
-    init(minutes: Int) {
-        let clamped = min(max(minutes, 0), AutoOffPreset.maxCustomMinutes)
-        self.minutes = clamped
-        self.customMinutes = clamped > 0 ? clamped : 45
-        self.isCustom = clamped > 0 && !AutoOffPreset.isQuickPick(clamped)
+    init(schedule: AutoOffSchedule) {
+        let clamped = AutoOffSchedule.clamped(schedule)
+        self.schedule = clamped
+        switch clamped {
+        case .off:
+            self.customMinutes = 45
+            self.untilMinutes = AutoOffPreset.defaultUntilMinutesFromMidnight
+            self.isCustom = false
+            self.isUntil = false
+        case .duration(let minutes):
+            self.customMinutes = minutes
+            self.untilMinutes = AutoOffPreset.defaultUntilMinutesFromMidnight
+            self.isCustom = !AutoOffPreset.isQuickPick(minutes)
+            self.isUntil = false
+        case .until(let minutes):
+            self.customMinutes = 45
+            self.untilMinutes = minutes
+            self.isCustom = false
+            self.isUntil = true
+        }
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         build()
@@ -61,18 +86,28 @@ final class AutoOffTimerControl: NSView {
     deinit {
         displayTimer?.invalidate()
         customPopover.close()
+        untilPopover.close()
     }
 
     // MARK: - Public API
 
     /// Update the control from an external source (e.g. Preferences).
-    func setMinutes(_ newValue: Int) {
-        let clamped = min(max(newValue, 0), AutoOffPreset.maxCustomMinutes)
-        minutes = clamped
-        if clamped > 0 {
-            customMinutes = clamped
+    func setSchedule(_ newValue: AutoOffSchedule) {
+        let clamped = AutoOffSchedule.clamped(newValue)
+        schedule = clamped
+        switch clamped {
+        case .off:
+            isCustom = false
+            isUntil = false
+        case .duration(let minutes):
+            customMinutes = minutes
+            isCustom = !AutoOffPreset.isQuickPick(minutes)
+            isUntil = false
+        case .until(let minutes):
+            untilMinutes = minutes
+            isCustom = false
+            isUntil = true
         }
-        isCustom = clamped > 0 && !AutoOffPreset.isQuickPick(clamped)
         refreshSelection()
         renderDisplay()
     }
@@ -81,6 +116,7 @@ final class AutoOffTimerControl: NSView {
         desc: String,
         off: String,
         custom: String,
+        until: String,
         turnsOffIn: String,
         hours: String,
         minutesUnit: String,
@@ -89,12 +125,15 @@ final class AutoOffTimerControl: NSView {
         descLabel.stringValue = desc
         offChip.setText(off)
         customChip.setText(custom)
+        untilChip.setText(until)
         for entry in presetChips {
             entry.chip.setText(AutoOffFormatter.durationLabel(minutes: entry.minutes))
         }
         turnsOffInText = turnsOffIn
         hoursUnitLabel.stringValue = hours
         minutesUnitLabel.stringValue = minutesUnit
+        untilHoursUnitLabel.stringValue = hours
+        untilMinutesUnitLabel.stringValue = minutesUnit
         restartButton.setAccessibilityLabel(restart)
         restartButton.toolTip = restart
         renderDisplay()
@@ -121,10 +160,15 @@ final class AutoOffTimerControl: NSView {
     /// Close transient UI when the settings page or window is dismissed.
     func dismissCustomEditor() {
         customPopover.close()
+        untilPopover.close()
     }
 
     var isCustomEditorVisible: Bool {
         customPopover.isShown
+    }
+
+    var isUntilEditorVisible: Bool {
+        untilPopover.isShown
     }
 
     // MARK: - Build
@@ -165,6 +209,7 @@ final class AutoOffTimerControl: NSView {
 
         buildChips()
         buildCustomEditor()
+        buildUntilEditor()
 
         column.orientation = .vertical
         column.alignment = .leading
@@ -190,10 +235,13 @@ final class AutoOffTimerControl: NSView {
 
     private func buildChips() {
         offChip = AutoOffChip(text: "Off")
-        offChip.onClick = { [weak self] in self?.selectPreset(0) }
+        offChip.onClick = { [weak self] in self?.selectOff() }
 
         customChip = AutoOffChip(text: "Custom")
         customChip.onClick = { [weak self] in self?.selectCustom() }
+
+        untilChip = AutoOffChip(text: "Until")
+        untilChip.onClick = { [weak self] in self?.selectUntil() }
 
         var firstRow: [AutoOffChip] = [offChip]
         var secondRow: [AutoOffChip] = []
@@ -216,10 +264,18 @@ final class AutoOffTimerControl: NSView {
 
         let row1 = chipRow(firstRow)
         let row2 = chipRow(secondRow)
+        let row3 = NSStackView(views: [untilChip])
+        row3.orientation = .horizontal
+        row3.alignment = .centerY
+        row3.spacing = 8
+        row3.translatesAutoresizingMaskIntoConstraints = false
         chipsColumn.addArrangedSubview(row1)
         chipsColumn.addArrangedSubview(row2)
+        chipsColumn.addArrangedSubview(row3)
         row1.widthAnchor.constraint(equalTo: chipsColumn.widthAnchor).isActive = true
         row2.widthAnchor.constraint(equalTo: chipsColumn.widthAnchor).isActive = true
+        row3.widthAnchor.constraint(equalTo: chipsColumn.widthAnchor).isActive = true
+        untilChip.widthAnchor.constraint(equalTo: offChip.widthAnchor).isActive = true
     }
 
     private func chipRow(_ chips: [AutoOffChip]) -> NSStackView {
@@ -281,6 +337,55 @@ final class AutoOffTimerControl: NSView {
         customPopover.appearance = NSAppearance(named: .darkAqua)
     }
 
+    private func buildUntilEditor() {
+        let hoursRow = stepperRow(
+            unitLabel: untilHoursUnitLabel,
+            valueLabel: untilHoursValueLabel,
+            onMinus: { [weak self] in
+                self?.adjustUntil(byMinutes: -AutoOffPreset.untilHourStep)
+            },
+            onPlus: { [weak self] in
+                self?.adjustUntil(byMinutes: AutoOffPreset.untilHourStep)
+            }
+        )
+        let minutesRow = stepperRow(
+            unitLabel: untilMinutesUnitLabel,
+            valueLabel: untilMinutesValueLabel,
+            onMinus: { [weak self] in
+                self?.adjustUntil(byMinutes: -AutoOffPreset.untilMinuteStep)
+            },
+            onPlus: { [weak self] in
+                self?.adjustUntil(byMinutes: AutoOffPreset.untilMinuteStep)
+            }
+        )
+
+        let stack = NSStackView(views: [hoursRow, minutesRow])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        untilEditor.frame = NSRect(x: 0, y: 0, width: 300, height: 116)
+        untilEditor.wantsLayer = true
+        untilEditor.layer?.backgroundColor = Brand.surface.cgColor
+        untilEditor.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: untilEditor.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: untilEditor.trailingAnchor, constant: -16),
+            stack.topAnchor.constraint(equalTo: untilEditor.topAnchor, constant: 16),
+            stack.bottomAnchor.constraint(equalTo: untilEditor.bottomAnchor, constant: -16),
+            hoursRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            minutesRow.widthAnchor.constraint(equalTo: stack.widthAnchor)
+        ])
+
+        let controller = NSViewController()
+        controller.view = untilEditor
+        untilPopover.contentViewController = controller
+        untilPopover.contentSize = untilEditor.frame.size
+        untilPopover.behavior = .transient
+        untilPopover.animates = false
+        untilPopover.appearance = NSAppearance(named: .darkAqua)
+    }
+
     private func stepperRow(
         unitLabel: NSTextField,
         valueLabel: NSTextField,
@@ -316,28 +421,88 @@ final class AutoOffTimerControl: NSView {
 
     // MARK: - Selection
 
+    private func selectOff() {
+        applySchedule(.off, toggleUntilEditor: false)
+    }
+
     private func selectPreset(_ value: Int) {
-        customPopover.close()
-        isCustom = false
-        minutes = value
-        refreshSelection()
-        onMinutesChange?(value)
-        renderDisplay()
+        applySchedule(.duration(minutes: value), toggleUntilEditor: false)
     }
 
     private func selectCustom() {
-        isCustom = true
-        minutes = min(max(customMinutes, AutoOffPreset.minCustomMinutes), AutoOffPreset.maxCustomMinutes)
-        customMinutes = minutes
-        refreshSelection()
-        onMinutesChange?(minutes)
-        renderDisplay()
-        if customPopover.isShown {
+        let selectedMinutes = min(
+            max(customMinutes, AutoOffPreset.minCustomMinutes),
+            AutoOffPreset.maxCustomMinutes
+        )
+        customMinutes = selectedMinutes
+        applySchedule(.duration(minutes: selectedMinutes), toggleCustomEditor: true)
+    }
+
+    private func selectUntil() {
+        applySchedule(
+            .until(minutesFromMidnight: untilMinutes),
+            toggleUntilEditor: true
+        )
+    }
+
+    private func applySchedule(
+        _ next: AutoOffSchedule,
+        toggleCustomEditor: Bool = false,
+        toggleUntilEditor: Bool = false,
+        preserveCustomEditor: Bool = false,
+        preserveUntilEditor: Bool = false
+    ) {
+        let clamped = AutoOffSchedule.clamped(next)
+        if !toggleCustomEditor && !preserveCustomEditor {
             customPopover.close()
+        }
+        if !toggleUntilEditor && !preserveUntilEditor {
+            untilPopover.close()
+        }
+
+        switch clamped {
+        case .off:
+            isCustom = false
+            isUntil = false
+        case .duration(let minutes):
+            isUntil = false
+            if toggleCustomEditor || preserveCustomEditor {
+                isCustom = true
+            } else {
+                isCustom = !AutoOffPreset.isQuickPick(minutes)
+            }
+            if minutes > 0 {
+                customMinutes = minutes
+            }
+        case .until(let minutes):
+            isCustom = false
+            isUntil = true
+            untilMinutes = minutes
+        }
+
+        let changed = schedule != clamped
+        schedule = clamped
+        refreshSelection()
+        if changed {
+            onScheduleChange?(clamped)
+        }
+        renderDisplay()
+
+        if toggleCustomEditor {
+            togglePopover(customPopover, relativeTo: customChip)
+        }
+        if toggleUntilEditor {
+            togglePopover(untilPopover, relativeTo: untilChip)
+        }
+    }
+
+    private func togglePopover(_ popover: NSPopover, relativeTo chip: AutoOffChip) {
+        if popover.isShown {
+            popover.close()
         } else {
-            customPopover.show(
-                relativeTo: customChip.bounds,
-                of: customChip,
+            popover.show(
+                relativeTo: chip.bounds,
+                of: chip,
                 preferredEdge: .minY
             )
         }
@@ -347,31 +512,40 @@ final class AutoOffTimerControl: NSView {
         let updated = AutoOffPreset.adjustedCustomMinutes(customMinutes, by: delta)
         guard updated != customMinutes else { return }
         customMinutes = updated
-        minutes = updated
-        refreshSelection()
-        onMinutesChange?(updated)
-        renderDisplay()
+        applySchedule(.duration(minutes: updated), preserveCustomEditor: true)
+    }
+
+    private func adjustUntil(byMinutes delta: Int) {
+        let updated = AutoOffPreset.adjustedUntilMinutes(untilMinutes, by: delta)
+        guard updated != untilMinutes else { return }
+        untilMinutes = updated
+        applySchedule(.until(minutesFromMidnight: updated), preserveUntilEditor: true)
     }
 
     private func refreshSelection() {
-        offChip.setSelected(!isCustom && minutes == 0)
+        offChip.setSelected(!isCustom && !isUntil && !schedule.isArmed)
         customChip.setSelected(isCustom)
+        untilChip.setSelected(isUntil)
         for entry in presetChips {
-            entry.chip.setSelected(!isCustom && entry.minutes == minutes)
+            entry.chip.setSelected(
+                !isCustom && !isUntil && schedule == .duration(minutes: entry.minutes)
+            )
         }
         hoursValueLabel.stringValue = "\(customMinutes / 60)"
         minutesValueLabel.stringValue = String(format: "%02d", customMinutes % 60)
-        restartButton.isHidden = (minutes == 0)
+        untilHoursValueLabel.stringValue = String(format: "%02d", untilMinutes / 60)
+        untilMinutesValueLabel.stringValue = String(format: "%02d", untilMinutes % 60)
+        restartButton.isHidden = !schedule.isArmed
     }
 
     private func renderDisplay() {
-        let state = displayProvider?() ?? .idle(minutes: minutes)
+        let state = displayProvider?() ?? .idle(schedule)
         switch state {
-        case let .idle(armedMinutes):
+        case let .idle(idleSchedule):
             captionLabel.isHidden = true
             captionLabel.stringValue = ""
-            countdownLabel.stringValue = AutoOffFormatter.durationLabel(minutes: armedMinutes)
-            countdownLabel.textColor = armedMinutes > 0 ? Brand.text : Brand.textDim
+            countdownLabel.stringValue = AutoOffFormatter.idleLabel(for: idleSchedule)
+            countdownLabel.textColor = idleSchedule.isArmed ? Brand.text : Brand.textDim
         case .infinite:
             captionLabel.isHidden = true
             captionLabel.stringValue = ""

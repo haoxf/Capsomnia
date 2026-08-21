@@ -24,13 +24,59 @@ enum AutoOffPreset {
     static func adjustedCustomMinutes(_ minutes: Int, by delta: Int) -> Int {
         min(max(minutes + delta, minCustomMinutes), maxCustomMinutes)
     }
+
+    static let minutesPerDay = 24 * 60
+    static let defaultUntilMinutesFromMidnight = 23 * 60
+    static let untilHourStep = 60
+    static let untilMinuteStep = 1
+
+    static func clampedUntilMinutes(_ minutes: Int) -> Int {
+        min(max(minutes, 0), minutesPerDay - 1)
+    }
+
+    /// Wrap a clock-time adjustment into `00:00...23:59`.
+    static func adjustedUntilMinutes(_ minutes: Int, by delta: Int) -> Int {
+        let day = minutesPerDay
+        let total = clampedUntilMinutes(minutes) + delta
+        return ((total % day) + day) % day
+    }
+}
+
+/// Configured auto-off behavior. Duration and clock-time are mutually exclusive.
+enum AutoOffSchedule: Equatable {
+    case off
+    case duration(minutes: Int)
+    case until(minutesFromMidnight: Int)
+
+    var isArmed: Bool {
+        switch self {
+        case .off:
+            return false
+        case .duration(let minutes):
+            return minutes > 0
+        case .until:
+            return true
+        }
+    }
+
+    static func clamped(_ schedule: AutoOffSchedule) -> AutoOffSchedule {
+        switch schedule {
+        case .off:
+            return .off
+        case .duration(let minutes):
+            let clamped = min(max(minutes, 0), AutoOffPreset.maxCustomMinutes)
+            return clamped == 0 ? .off : .duration(minutes: clamped)
+        case .until(let minutes):
+            return .until(minutesFromMidnight: AutoOffPreset.clampedUntilMinutes(minutes))
+        }
+    }
 }
 
 /// What the auto-off readout should show. Computed by the app delegate from the
 /// live Caps Lock state and the pending timer state; rendered by the UI control.
 enum AutoOffDisplayState: Equatable {
-    /// Awake mode is off. Shows the configured duration (or infinity when `minutes == 0`).
-    case idle(minutes: Int)
+    /// Awake mode is off. Shows the configured duration, clock time, or infinity.
+    case idle(AutoOffSchedule)
     /// Awake mode is on with no timer configured.
     case infinite
     /// Awake mode is on and a timer is running down.
@@ -70,6 +116,13 @@ final class AutoOffSleepCoordinator {
         isPending = result == .changed(to: false)
     }
 
+    @discardableResult
+    func cancelPending() -> Bool {
+        let wasPending = isPending
+        isPending = false
+        return wasPending
+    }
+
     /// Requests sleep once the confirmed state is OFF. A confirmed ON state
     /// means the user re-enabled awake mode before completion, so the pending
     /// sleep is cancelled rather than firing later against their intent.
@@ -93,27 +146,27 @@ enum AutoOffPolicy {
     ///
     /// - Parameters:
     ///   - capsLockOn: whether awake mode (Caps Lock) is currently on.
-    ///   - autoOffMinutes: the configured duration; `0` disables the timer.
+    ///   - schedule: the configured duration, clock time, or off.
     ///   - now: the current instant.
+    ///   - calendar: used only for clock-time schedules.
     ///   - state: the current timer state.
     /// - Returns: the next `state` to persist and `shouldFire`, which is `true`
     ///   exactly once when the countdown reaches zero.
     static func evaluate(
         capsLockOn: Bool,
-        autoOffMinutes: Int,
+        schedule: AutoOffSchedule,
         now: Date,
+        calendar: Calendar = .current,
         state: AutoOffState
     ) -> (state: AutoOffState, shouldFire: Bool) {
         // Timer disabled: no deadline, no memory.
-        guard autoOffMinutes > 0 else {
+        guard schedule.isArmed else {
             return (AutoOffState(), false)
         }
 
-        let fullDuration = TimeInterval(autoOffMinutes) * 60
-
         guard capsLockOn else {
             // Turning awake mode off ends the current timer session. The next
-            // re-enable always starts a fresh full-duration countdown.
+            // re-enable always starts a fresh countdown.
             return (AutoOffState(), false)
         }
 
@@ -126,22 +179,63 @@ enum AutoOffPolicy {
         }
 
         // Just turned on (or the timer was just re-armed): begin a fresh countdown.
-        return (AutoOffState(deadline: now.addingTimeInterval(fullDuration)), false)
+        guard let deadline = deadline(for: schedule, now: now, calendar: calendar) else {
+            return (AutoOffState(), false)
+        }
+        return (AutoOffState(deadline: deadline), false)
     }
 
-    /// A fresh full-duration state for the explicit Restart action.
+    /// A fresh countdown for the explicit Restart action.
     static func restarted(
         capsLockOn: Bool,
-        autoOffMinutes: Int,
-        now: Date
+        schedule: AutoOffSchedule,
+        now: Date,
+        calendar: Calendar = .current
     ) -> AutoOffState {
-        guard autoOffMinutes > 0 else { return AutoOffState() }
-        let fullDuration = TimeInterval(autoOffMinutes) * 60
-        if capsLockOn {
-            return AutoOffState(deadline: now.addingTimeInterval(fullDuration))
+        guard schedule.isArmed else { return AutoOffState() }
+        guard capsLockOn else { return AutoOffState() }
+        return AutoOffState(deadline: deadline(for: schedule, now: now, calendar: calendar))
+    }
+
+    /// Next fire instant for `schedule`. Clock-time values that are already
+    /// past (or exactly now) roll to the following day.
+    static func deadline(
+        for schedule: AutoOffSchedule,
+        now: Date,
+        calendar: Calendar = .current
+    ) -> Date? {
+        switch AutoOffSchedule.clamped(schedule) {
+        case .off:
+            return nil
+        case .duration(let minutes):
+            return now.addingTimeInterval(TimeInterval(minutes) * 60)
+        case .until(let minutesFromMidnight):
+            return nextClockTime(
+                minutesFromMidnight: minutesFromMidnight,
+                after: now,
+                calendar: calendar
+            )
         }
-        // Awake mode is off: the next re-enable starts the full duration anyway.
-        return AutoOffState()
+    }
+
+    static func nextClockTime(
+        minutesFromMidnight: Int,
+        after now: Date,
+        calendar: Calendar = .current
+    ) -> Date {
+        let clamped = AutoOffPreset.clampedUntilMinutes(minutesFromMidnight)
+        var components = DateComponents()
+        components.hour = clamped / 60
+        components.minute = clamped % 60
+        components.second = 0
+        if let next = calendar.nextDate(
+            after: now,
+            matching: components,
+            matchingPolicy: .nextTime
+        ) {
+            return next
+        }
+        return now.addingTimeInterval(TimeInterval(AutoOffPreset.minutesPerDay * 60))
     }
 }
 
@@ -161,6 +255,23 @@ enum AutoOffFormatter {
         if hours == 0 { return "\(mins)m" }
         if mins == 0 { return "\(hours)h" }
         return "\(hours)h \(mins)m"
+    }
+
+    /// Language-neutral clock label: "00:00", "09:05", "23:00".
+    static func clockLabel(minutesFromMidnight: Int) -> String {
+        let clamped = AutoOffPreset.clampedUntilMinutes(minutesFromMidnight)
+        return String(format: "%02d:%02d", clamped / 60, clamped % 60)
+    }
+
+    static func idleLabel(for schedule: AutoOffSchedule) -> String {
+        switch AutoOffSchedule.clamped(schedule) {
+        case .off:
+            return durationLabel(minutes: 0)
+        case .duration(let minutes):
+            return durationLabel(minutes: minutes)
+        case .until(let minutes):
+            return clockLabel(minutesFromMidnight: minutes)
+        }
     }
 
     private static func components(_ remaining: TimeInterval) -> (Int, Int, Int) {

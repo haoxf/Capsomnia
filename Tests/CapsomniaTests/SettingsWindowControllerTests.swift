@@ -168,15 +168,27 @@ final class SettingsWindowControllerTests: XCTestCase {
             strings.language,
             strings.systemBehavior.uppercased(),
             strings.displaySleepOnLidClose,
+            strings.ignoreExternalCapsLockOffWhileLidClosed,
+            strings.respectExternalSleepPrevention,
             strings.openAtLogin,
             strings.autoOffTimer.uppercased(),
             strings.autoOffOff,
             strings.autoOffCustom,
+            strings.autoOffUntil,
             strings.keyboardShortcut.uppercased(),
             strings.keyboardShortcut,
             strings.keyboardShortcutDesc
         ] {
             XCTAssertTrue(renderedText.contains(expected), "Missing rendered text: \(expected)")
+        }
+        for label in visibleLabels where !label.stringValue.isEmpty {
+            let frame = label.convert(label.bounds, to: contentView)
+            XCTAssertGreaterThanOrEqual(frame.minX, -1, "\(label.stringValue) starts outside the window")
+            XCTAssertGreaterThanOrEqual(frame.minY, -1, "\(label.stringValue) starts below the window")
+            XCTAssertLessThanOrEqual(frame.maxX, contentView.bounds.maxX + 1,
+                                     "\(label.stringValue) extends outside the window")
+            XCTAssertLessThanOrEqual(frame.maxY, contentView.bounds.maxY + 1,
+                                     "\(label.stringValue) extends above the window")
         }
 
         let preferencesHeading = try XCTUnwrap(
@@ -246,12 +258,12 @@ final class SettingsWindowControllerTests: XCTestCase {
 
     func testAutoOffCustomEditorDoesNotResizeOrShiftTheSettingsWindow() throws {
         let previousLanguage = Preferences.language
-        let previousMinutes = Preferences.autoOffMinutes
+        let previousSchedule = Preferences.autoOffSchedule
         Preferences.language = .english
-        Preferences.autoOffMinutes = 60
+        Preferences.autoOffSchedule = .duration(minutes: 60)
         defer {
             Preferences.language = previousLanguage
-            Preferences.autoOffMinutes = previousMinutes
+            Preferences.autoOffSchedule = previousSchedule
         }
         let strings = AppStrings.localized(for: .english)
 
@@ -314,19 +326,127 @@ final class SettingsWindowControllerTests: XCTestCase {
         }
     }
 
+    func testReselectingCurrentAutoOffDurationDoesNotReportAChange() throws {
+        let previousLanguage = Preferences.language
+        let previousSchedule = Preferences.autoOffSchedule
+        Preferences.language = .english
+        Preferences.autoOffSchedule = .duration(minutes: 60)
+        defer {
+            Preferences.language = previousLanguage
+            Preferences.autoOffSchedule = previousSchedule
+        }
+
+        var reportedSchedules: [AutoOffSchedule] = []
+        _ = NSApplication.shared
+        let controller = makeController(
+            onAutoOffScheduleChange: { reportedSchedules.append($0) }
+        )
+        defer { controller.close() }
+
+        controller.show(page: .advancedSettings)
+        let contentView = try XCTUnwrap(controller.window?.contentView)
+        contentView.layoutSubtreeIfNeeded()
+        let selectedPreset = try XCTUnwrap(
+            view(
+                in: contentView,
+                accessibilityLabel: AutoOffFormatter.durationLabel(minutes: 60)
+            )
+        )
+
+        XCTAssertTrue(selectedPreset.accessibilityPerformPress())
+        XCTAssertTrue(reportedSchedules.isEmpty)
+    }
+
+    func testTogglingCurrentCustomAutoOffEditorDoesNotReportAChange() throws {
+        let previousLanguage = Preferences.language
+        let previousSchedule = Preferences.autoOffSchedule
+        Preferences.language = .english
+        Preferences.autoOffSchedule = .duration(minutes: 45)
+        defer {
+            Preferences.language = previousLanguage
+            Preferences.autoOffSchedule = previousSchedule
+        }
+
+        var reportedSchedules: [AutoOffSchedule] = []
+        _ = NSApplication.shared
+        let controller = makeController(
+            onAutoOffScheduleChange: { reportedSchedules.append($0) }
+        )
+        defer { controller.close() }
+
+        controller.show(page: .advancedSettings)
+        let contentView = try XCTUnwrap(controller.window?.contentView)
+        contentView.layoutSubtreeIfNeeded()
+        let customChip = try XCTUnwrap(
+            view(
+                in: contentView,
+                accessibilityLabel: AppStrings.localized(for: .english).autoOffCustom
+            )
+        )
+
+        XCTAssertTrue(customChip.accessibilityPerformPress())
+        XCTAssertTrue(customChip.accessibilityPerformPress())
+        XCTAssertTrue(reportedSchedules.isEmpty)
+    }
+
+    func testReselectingCurrentUntilScheduleDoesNotReportAChange() throws {
+        let previousLanguage = Preferences.language
+        let previousSchedule = Preferences.autoOffSchedule
+        Preferences.language = .english
+        Preferences.autoOffSchedule = .until(minutesFromMidnight: 23 * 60)
+        defer {
+            Preferences.language = previousLanguage
+            Preferences.autoOffSchedule = previousSchedule
+        }
+
+        var reportedSchedules: [AutoOffSchedule] = []
+        _ = NSApplication.shared
+        let controller = makeController(
+            onAutoOffScheduleChange: { reportedSchedules.append($0) }
+        )
+        defer { controller.close() }
+
+        controller.show(page: .advancedSettings)
+        let contentView = try XCTUnwrap(controller.window?.contentView)
+        contentView.layoutSubtreeIfNeeded()
+        let untilChip = try XCTUnwrap(
+            view(
+                in: contentView,
+                accessibilityLabel: AppStrings.localized(for: .english).autoOffUntil
+            )
+        )
+        let timerControl: AutoOffTimerControl = try XCTUnwrap(descendants(of: contentView).first)
+
+        XCTAssertTrue(untilChip.accessibilityPerformPress())
+        XCTAssertTrue(untilChip.accessibilityPerformPress())
+        XCTAssertTrue(reportedSchedules.isEmpty)
+        XCTAssertFalse(timerControl.isUntilEditorVisible)
+    }
+
+    func testSettingsEntryOpensAdvancedAfterInitialSetup() {
+        XCTAssertEqual(
+            SettingsEntryPolicy.page(didCompleteInitialSetup: false),
+            .initialPreferences
+        )
+        XCTAssertEqual(
+            SettingsEntryPolicy.page(didCompleteInitialSetup: true),
+            .advancedSettings
+        )
+    }
+
     func testRestartButtonShownWhenTimerIsSetAndHiddenWhenOff() throws {
         let previousLanguage = Preferences.language
-        let previousMinutes = Preferences.autoOffMinutes
+        let previousSchedule = Preferences.autoOffSchedule
         Preferences.language = .english
         defer {
             Preferences.language = previousLanguage
-            Preferences.autoOffMinutes = previousMinutes
+            Preferences.autoOffSchedule = previousSchedule
         }
         let restartLabel = AppStrings.localized(for: .english).autoOffRestart
         _ = NSApplication.shared
 
         // A finite timer -> the restart icon is available.
-        Preferences.autoOffMinutes = 45
+        Preferences.autoOffSchedule = .duration(minutes: 45)
         let onController = makeController()
         defer { onController.close() }
         onController.show(page: .advancedSettings)
@@ -336,7 +456,7 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertFalse(shown.isHidden, "Restart icon should be available when a timer is set")
 
         // No timer (Off) -> the restart icon is hidden.
-        Preferences.autoOffMinutes = 0
+        Preferences.autoOffSchedule = .off
         let offController = makeController()
         defer { offController.close() }
         offController.show(page: .advancedSettings)
@@ -353,7 +473,8 @@ final class SettingsWindowControllerTests: XCTestCase {
 
     private func makeController(
         onKeyboardShortcutRecordingChange: @escaping (Bool) -> Void = { _ in },
-        autoOffDisplayProvider: @escaping () -> AutoOffDisplayState = { .idle(minutes: 0) }
+        onAutoOffScheduleChange: @escaping (AutoOffSchedule) -> Void = { _ in },
+        autoOffDisplayProvider: @escaping () -> AutoOffDisplayState = { .idle(.off) }
     ) -> SettingsWindowController {
         SettingsWindowController(
             onDedicatedCapsLockModeChange: { _ in },
@@ -361,7 +482,9 @@ final class SettingsWindowControllerTests: XCTestCase {
             onLanguageChange: { _ in },
             onLaunchAtLoginChange: { _ in },
             onDisplaySleepOnLidCloseChange: { _ in },
-            onAutoOffMinutesChange: { _ in },
+            onIgnoreExternalCapsLockOffWhileLidClosedChange: { _ in },
+            onRespectExternalSleepPreventionChange: { _ in },
+            onAutoOffScheduleChange: onAutoOffScheduleChange,
             onAutoOffRestart: {},
             autoOffDisplayProvider: autoOffDisplayProvider,
             onKeyboardShortcutChange: { _ in true },

@@ -27,11 +27,16 @@ final class LocalizationTests: XCTestCase {
             XCTAssertFalse(strings.toggleCapsLock.isEmpty)
             XCTAssertFalse(strings.showMenuBarIcon.isEmpty)
             XCTAssertFalse(strings.displaySleepOnLidClose.isEmpty)
+            XCTAssertFalse(strings.ignoreExternalCapsLockOffWhileLidClosed.isEmpty)
+            XCTAssertFalse(strings.ignoreExternalCapsLockOffWhileLidClosedDesc.isEmpty)
+            XCTAssertFalse(strings.respectExternalSleepPrevention.isEmpty)
+            XCTAssertFalse(strings.respectExternalSleepPreventionDesc.isEmpty)
             XCTAssertFalse(strings.openAtLogin.isEmpty)
             XCTAssertFalse(strings.language.isEmpty)
             XCTAssertFalse(strings.advancedSettings.isEmpty)
             XCTAssertFalse(strings.systemBehavior.isEmpty)
-            XCTAssertFalse(strings.keyboardShortcut.isEmpty)
+            XCTAssertFalse(strings.autoOffCustom.isEmpty)
+            XCTAssertFalse(strings.autoOffUntil.isEmpty)
             XCTAssertFalse(strings.keyboardShortcutDesc.isEmpty)
             XCTAssertFalse(strings.shortcutRecorderPlaceholder.isEmpty)
             XCTAssertFalse(strings.shortcutRecorderRecording.isEmpty)
@@ -40,6 +45,7 @@ final class LocalizationTests: XCTestCase {
             XCTAssertFalse(strings.initialPreferencesHeading.isEmpty)
             XCTAssertFalse(strings.done.isEmpty)
             XCTAssertFalse(strings.tooltipDedicatedPermission.isEmpty)
+            XCTAssertFalse(strings.tooltipExternalSleepPrevention.isEmpty)
         }
     }
 

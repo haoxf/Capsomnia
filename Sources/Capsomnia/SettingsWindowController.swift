@@ -6,6 +6,12 @@ enum SettingsPage {
     case advancedSettings
 }
 
+enum SettingsEntryPolicy {
+    static func page(didCompleteInitialSetup: Bool) -> SettingsPage {
+        didCompleteInitialSetup ? .advancedSettings : .initialPreferences
+    }
+}
+
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private static let settingsContentWidth: CGFloat = 400
     private static let advancedContentWidth: CGFloat = 920
@@ -42,7 +48,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let advancedSettingsButton = DisclosureButton()
 
     private let autoOffHeading = brandLabel(size: 11, weight: .semibold, color: Brand.textFaint)
-    private let autoOffControl = AutoOffTimerControl(minutes: Preferences.autoOffMinutes)
+    private let autoOffControl = AutoOffTimerControl(schedule: Preferences.autoOffSchedule)
 
     private let systemBehaviorHeading = brandLabel(
         size: 11,
@@ -64,6 +70,32 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     )
     private let displaySleepOnLidCloseToggle = LEDToggle(
         isOn: Preferences.displaySleepOnLidClose
+    )
+    private let externalCapsLockOffTitle = brandLabel(
+        size: 13,
+        weight: .medium,
+        color: Brand.text
+    )
+    private let externalCapsLockOffDesc = brandLabel(
+        size: 12,
+        color: Brand.textDim,
+        wraps: true
+    )
+    private let externalCapsLockOffToggle = LEDToggle(
+        isOn: Preferences.ignoreExternalCapsLockOffWhileLidClosed
+    )
+    private let respectExternalSleepPreventionTitle = brandLabel(
+        size: 13,
+        weight: .medium,
+        color: Brand.text
+    )
+    private let respectExternalSleepPreventionDesc = brandLabel(
+        size: 12,
+        color: Brand.textDim,
+        wraps: true
+    )
+    private let respectExternalSleepPreventionToggle = LEDToggle(
+        isOn: Preferences.respectExternalSleepPrevention
     )
 
     private let shortcutHeading = brandLabel(
@@ -101,7 +133,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let onLanguageChange: (AppLanguage) -> Void
     private let onLaunchAtLoginChange: (Bool) -> Void
     private let onDisplaySleepOnLidCloseChange: (Bool) -> Void
-    private let onAutoOffMinutesChange: (Int) -> Void
+    private let onIgnoreExternalCapsLockOffWhileLidClosedChange: (Bool) -> Void
+    private let onRespectExternalSleepPreventionChange: (Bool) -> Void
+    private let onAutoOffScheduleChange: (AutoOffSchedule) -> Void
     private let onAutoOffRestart: () -> Void
     private let autoOffDisplayProvider: () -> AutoOffDisplayState
     private let onKeyboardShortcutChange: (KeyboardShortcut?) -> Bool
@@ -115,7 +149,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         onLanguageChange: @escaping (AppLanguage) -> Void,
         onLaunchAtLoginChange: @escaping (Bool) -> Void,
         onDisplaySleepOnLidCloseChange: @escaping (Bool) -> Void,
-        onAutoOffMinutesChange: @escaping (Int) -> Void,
+        onIgnoreExternalCapsLockOffWhileLidClosedChange: @escaping (Bool) -> Void,
+        onRespectExternalSleepPreventionChange: @escaping (Bool) -> Void,
+        onAutoOffScheduleChange: @escaping (AutoOffSchedule) -> Void,
         onAutoOffRestart: @escaping () -> Void,
         autoOffDisplayProvider: @escaping () -> AutoOffDisplayState,
         onKeyboardShortcutChange: @escaping (KeyboardShortcut?) -> Bool,
@@ -127,7 +163,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         self.onLanguageChange = onLanguageChange
         self.onLaunchAtLoginChange = onLaunchAtLoginChange
         self.onDisplaySleepOnLidCloseChange = onDisplaySleepOnLidCloseChange
-        self.onAutoOffMinutesChange = onAutoOffMinutesChange
+        self.onIgnoreExternalCapsLockOffWhileLidClosedChange = onIgnoreExternalCapsLockOffWhileLidClosedChange
+        self.onRespectExternalSleepPreventionChange = onRespectExternalSleepPreventionChange
+        self.onAutoOffScheduleChange = onAutoOffScheduleChange
         self.onAutoOffRestart = onAutoOffRestart
         self.autoOffDisplayProvider = autoOffDisplayProvider
         self.onKeyboardShortcutChange = onKeyboardShortcutChange
@@ -200,6 +238,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         displaySleepOnLidCloseTitle.stringValue = strings.displaySleepOnLidClose
         displaySleepOnLidCloseDesc.stringValue = strings.displaySleepOnLidCloseDesc
         displaySleepOnLidCloseToggle.setAccessibilityLabel(strings.displaySleepOnLidClose)
+        externalCapsLockOffTitle.stringValue = strings.ignoreExternalCapsLockOffWhileLidClosed
+        externalCapsLockOffDesc.stringValue = strings.ignoreExternalCapsLockOffWhileLidClosedDesc
+        externalCapsLockOffToggle.setAccessibilityLabel(strings.ignoreExternalCapsLockOffWhileLidClosed)
+        respectExternalSleepPreventionTitle.stringValue = strings.respectExternalSleepPrevention
+        respectExternalSleepPreventionDesc.stringValue = strings.respectExternalSleepPreventionDesc
+        respectExternalSleepPreventionToggle.setAccessibilityLabel(strings.respectExternalSleepPrevention)
         openAtLoginTitle.stringValue = strings.openAtLogin
         openAtLoginDesc.stringValue = strings.openAtLoginDesc
         openAtLoginToggle.setAccessibilityLabel(strings.openAtLogin)
@@ -209,6 +253,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             desc: strings.autoOffTimerDesc,
             off: strings.autoOffOff,
             custom: strings.autoOffCustom,
+            until: strings.autoOffUntil,
             turnsOffIn: strings.autoOffTurnsOffIn,
             hours: strings.autoOffHours,
             minutesUnit: strings.autoOffMinutesUnit,
@@ -576,6 +621,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             self?.onDisplaySleepOnLidCloseChange(enabled)
             self?.updateValues()
         }
+        externalCapsLockOffToggle.onToggle = { [weak self] enabled in
+            self?.onIgnoreExternalCapsLockOffWhileLidClosedChange(enabled)
+            self?.updateValues()
+        }
+        respectExternalSleepPreventionToggle.onToggle = { [weak self] enabled in
+            self?.onRespectExternalSleepPreventionChange(enabled)
+            self?.updateValues()
+        }
         openAtLoginToggle.onToggle = { [weak self] enabled in
             self?.onLaunchAtLoginChange(enabled)
             self?.updateValues()
@@ -585,14 +638,26 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             desc: displaySleepOnLidCloseDesc,
             accessory: displaySleepOnLidCloseToggle
         )
+        let externalCapsLockOffRow = settingRow(
+            title: externalCapsLockOffTitle,
+            desc: externalCapsLockOffDesc,
+            accessory: externalCapsLockOffToggle
+        )
         let openAtLoginRow = settingRow(
             title: openAtLoginTitle,
             desc: openAtLoginDesc,
             accessory: openAtLoginToggle
         )
+        let respectExternalSleepPreventionRow = settingRow(
+            title: respectExternalSleepPreventionTitle,
+            desc: respectExternalSleepPreventionDesc,
+            accessory: respectExternalSleepPreventionToggle
+        )
         let card = brandCard()
         let rows: [NSView] = [
             displayRow, brandDivider(),
+            externalCapsLockOffRow, brandDivider(),
+            respectExternalSleepPreventionRow, brandDivider(),
             openAtLoginRow
         ]
         let stack = NSStackView(views: rows)
@@ -643,8 +708,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func buildAutoOffCard() -> NSView {
-        autoOffControl.onMinutesChange = { [weak self] minutes in
-            self?.onAutoOffMinutesChange(minutes)
+        autoOffControl.onScheduleChange = { [weak self] schedule in
+            self?.onAutoOffScheduleChange(schedule)
         }
         autoOffControl.displayProvider = autoOffDisplayProvider
         autoOffControl.onRestart = { [weak self] in
@@ -667,9 +732,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         menuBarToggle.setOn(Preferences.showMenuBarIcon)
         languagePopUp.setSelected(Preferences.language.rawValue)
         displaySleepOnLidCloseToggle.setOn(Preferences.displaySleepOnLidClose)
+        externalCapsLockOffToggle.setOn(Preferences.ignoreExternalCapsLockOffWhileLidClosed)
+        respectExternalSleepPreventionToggle.setOn(Preferences.respectExternalSleepPrevention)
         openAtLoginToggle.setOn(Preferences.launchAtLogin)
         shortcutRecorder.setShortcut(Preferences.keyboardShortcut)
-        autoOffControl.setMinutes(Preferences.autoOffMinutes)
+        autoOffControl.setSchedule(Preferences.autoOffSchedule)
     }
 
     private func configureAdvancedHeader() {
